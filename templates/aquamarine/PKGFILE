@@ -1,0 +1,92 @@
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=aquamarine
+pkgver=0.12.1
+pkgrel=1
+pkgdesc='a very light linux rendering backend library'
+replaces=()
+provides=()
+arch=(x86_64 aarch64)
+url="https://github.com/hyprwm/$pkgname"
+license=(BSD-3-Clause)
+depends=(
+#	libgcc
+#	libstdc++
+#	glibc
+#	hyprutils
+#	hyprwayland-scanner
+#	libdisplay-info
+#	libdrm
+#	libglvnd
+#	libEGL.so
+#	libGLESv2.so
+#	libinput
+#	mesa
+#	opengl-driver
+#	pixman
+#	pugixml
+#	seatd
+#	libseat.so
+#	systemd-libs
+#	libudev.so
+#	wayland
+#	libwayland-client.so
+#	wayland-protocols
+
+	libEGL
+	libglvnd
+	glibc
+	libdisplay-info
+	libdrm
+	libgbm
+	libgcc
+	hyprutils
+	libinput
+	libseat
+	libstdc++
+	eudev-libudev
+	wayland
+)
+makedepends=(
+	cmake
+	hyprwayland-scanner
+	hyprutils
+)
+_archive="$pkgname-$pkgver"
+#source=("$url/archive/v$pkgver/$_archive.tar.gz")
+#sha256sums=('d3c74babe4321a31fba0db2c8c27ea4436876c2617cf69f57c1813095b87ff9b')
+source=("https://github.com/hyprwm/aquamarine/archive/refs/tags/v${pkgver}.tar.gz")
+checksum=80120257c983e18dec78c4df03246931b1bca1e44e50fb41ca21bad772479bd9
+
+build() {
+	cd "$_archive"
+	cmake -B build \
+		-D CMAKE_INSTALL_PREFIX=/usr \
+	  -D CMAKE_INSTALL_LIBDIR=lib \
+		-D CMAKE_BUILD_TYPE=Release
+	cmake --build build
+}
+
+package() {
+	cd "$_archive"
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
+}
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  log "Finalizando instalação"
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  log "Finalizando upgrade"
+}
+
+
