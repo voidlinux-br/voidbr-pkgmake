@@ -1,0 +1,201 @@
+# Maintainer: Catafesta <catafesta@chililinux.com>
+
+pkgname=louvorja-piano
+pkgver=1.22.1
+pkgrel=2
+pkgdesc="LouvorJA - PIANO - aplicativo desktop para gerenciamento de culto"
+arch=('x86_64')
+url="https://github.com/pianolouvorja/app"
+license=('MIT')
+
+depends=(
+	'electron'
+)
+
+makedepends=(
+	'nodejs'
+	'npm'
+)
+
+source=(
+	"https://github.com/pianolouvorja/app/archive/refs/tags/v${pkgver}.tar.gz"
+)
+
+sha256sums=('SKIP')
+
+build() {
+	cd "$srcdir/app-$pkgver"
+
+	# Pacote Linux nativo: impede que o aplicativo crie
+	# ~/.local/share/applications/louvorja-piano.desktop
+	# durante a execução.
+	python - <<'PY'
+from pathlib import Path
+
+p = Path("electron/app-icon.mjs")
+s = p.read_text()
+
+needle = """export function ensureLinuxTaskbarIntegration() {
+  if (process.platform !== 'linux') return
+"""
+
+replacement = """export function ensureLinuxTaskbarIntegration() {
+  if (process.platform !== 'linux') return
+  if (process.env.LOUVORJA_SYSTEM_PACKAGE === '1') return
+"""
+
+if needle not in s:
+    raise SystemExit(
+        "ensureLinuxTaskbarIntegration() não encontrado; "
+        "source incompatível com este PKGBUILD"
+    )
+
+p.write_text(s.replace(needle, replacement, 1))
+PY
+
+	npm ci --ignore-scripts
+
+	./node_modules/.bin/vite build --base=./
+}
+
+package() {
+	cd "$srcdir/app-$pkgver"
+
+	install -dm755 "$pkgdir/usr/lib/$pkgname"
+	install -dm755 "$pkgdir/usr/bin"
+	install -dm755 "$pkgdir/usr/share/applications"
+
+	# Frontend compilado
+	cp -a dist \
+		"$pkgdir/usr/lib/$pkgname/"
+
+	# Código principal do Electron.
+	# O EULA da v1.22.1 passou a estar em electron/legal/eula/.
+	# O eula.mjs procura esse caminho relativo a app.getAppPath().
+	# Portanto, não devemos mais instalar o EULA em docs/LEGAL/eula/.
+	# O cp abaixo preserva electron/legal/eula/ exatamente como vem
+	# no source.
+	cp -a electron \
+		"$pkgdir/usr/lib/$pkgname/"
+
+	# Assets públicos usados pelo aplicativo
+	cp -a public/ico \
+		"$pkgdir/usr/lib/$pkgname/"
+
+	# Dependências npm de runtime
+	install -dm755 "$pkgdir/usr/lib/$pkgname/node_modules"
+
+	while IFS= read -r -d '' item; do
+		cp -a "$item" \
+			"$pkgdir/usr/lib/$pkgname/node_modules/"
+	done < <(
+		find node_modules \
+			-mindepth 1 \
+			-maxdepth 1 \
+			! -name 'electron' \
+			! -name 'electron-builder' \
+			! -name 'vite' \
+			! -name 'vue-tsc' \
+			! -name 'typescript' \
+			! -name 'vitest' \
+			! -name 'concurrently' \
+			! -name 'cross-env' \
+			! -name 'npm-run-all2' \
+			! -name 'wait-on' \
+			! -name '@vitejs' \
+			! -name '@vue' \
+			! -name '@tailwindcss' \
+			! -name 'tailwindcss' \
+			! -name 'sass' \
+			! -name 'vite-plugin-electron' \
+			! -name 'vite-plugin-electron-renderer' \
+			! -name 'vite-plugin-vue-devtools' \
+			! -name '@playwright' \
+			! -name '@stryker-mutator' \
+			! -name '@test-utils' \
+			! -name 'jsdom' \
+			-print0
+	)
+
+	# Ícones para o tema hicolor
+	install -Dm644 \
+		public/ico/favicon-16x16.png \
+		"$pkgdir/usr/share/icons/hicolor/16x16/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/favicon-32x32.png \
+		"$pkgdir/usr/share/icons/hicolor/32x32/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/icon-64.png \
+		"$pkgdir/usr/share/icons/hicolor/64x64/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/icon-128.png \
+		"$pkgdir/usr/share/icons/hicolor/128x128/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/icon-256.png \
+		"$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+
+	install -Dm644 \
+		public/ico/favicon-512x512.png \
+		"$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
+
+	# Launcher
+	cat >"$pkgdir/usr/bin/$pkgname" <<EOF
+#!/bin/sh
+
+# O upstream cria uma entrada .desktop em
+# ~/.local/share/applications durante o startup através de
+# ensureLinuxTaskbarIntegration(). Como este é um pacote nativo,
+# o .desktop correto já é instalado em /usr/share/applications.
+# Esta variável desativa somente essa integração específica.
+export LOUVORJA_SYSTEM_PACKAGE=1
+
+cd /usr/lib/$pkgname
+
+exec /usr/bin/electron \
+	--disable-gpu \
+	/usr/lib/$pkgname/electron/main.mjs "\$@"
+EOF
+
+	chmod 755 "$pkgdir/usr/bin/$pkgname"
+
+	# Desktop entry do pacote.
+	# O arquivo fica no diretório global do sistema, portanto o
+	# aplicativo não precisa criar uma cópia em ~/.local/share/applications.
+	cat >"$pkgdir/usr/share/applications/org.kde.$pkgname.desktop" <<EOF
+[Desktop Entry]
+Name=LouvorJA - PIANO
+Comment=Aplicativo desktop para gerenciamento de culto
+Exec=/usr/bin/$pkgname
+Icon=$pkgname
+Terminal=false
+Type=Application
+Categories=X-VoidBR-Apps;AudioVideo;Qt;KDE;AudioVideoEditing;
+StartupWMClass=louvorja-piano
+StartupNotify=true
+EOF
+
+	# Licença
+	install -Dm644 \
+		LICENSE.md \
+		"$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
