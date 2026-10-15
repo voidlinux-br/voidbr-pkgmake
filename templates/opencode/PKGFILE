@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# NOTE: Imported from Arch Linux/AUR
 # Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
-# Maintainer: Carl Smedstad <carsme@archlinux.org>
-# Maintainer: Sven-Hendrik Haase <svenstaro@archlinux.org>
 
 pkgname=opencode
 pkgver=2.0.8
@@ -22,7 +19,7 @@ depends=(
 #  'nodejs-lts-jod'
 #)
 makedepends=(
-	'bun'
+	'bun-bin' # template local (templates/bun-bin), precisa estar no repositório
 	'git'
 )
 optdepends=(
@@ -38,7 +35,7 @@ b2sums=('1288de1314f02a21c06406bf2f4530b849acc056431c6d73c7ce092d456be4f25ff762b
 
 prepare() {
 	cd $pkgname
-	sed -i 's|"packageManager": "bun@1.4.2"|"packageManager": "bun@1.4.0"|' package.json
+	# o sed do Arch (bun@1.4.2 -> 1.4.0) não é necessário: o bun-bin do VoidBR já é 1.4.2
 	bun install --frozen-lockfile --ignore-scripts
 }
 
@@ -62,12 +59,9 @@ build() {
 
 package() {
 	cd $pkgname
-	case $CARCH in
-	aarch64) dir=cli-linux-arm64 ;;
-	x86_64) dir=cli-linux-x64-baseline ;;
-	esac
-	install -vDm755 -t "$pkgdir/usr/bin" "packages/cli/dist/$dir/bin/opencode"
+	dir=cli-linux-x64-baseline
 
+	install -vDm755 -t "$pkgdir/usr/bin" "packages/cli/dist/$dir/bin/opencode"
 	install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
 
 	"$pkgdir/usr/bin/opencode" --completions bash |

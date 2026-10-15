@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Maintainer: Vilmar Catafesta <vcatafesta@gmail.com>
+
+pkgname=bibata-rainbow-cursor-theme
+pkgver=1.1.2
+pkgrel=2
+pkgdesc="Material Based Cursor Theme: Rainbow"
+arch=('any')
+url="https://github.com/ful1e5/Bibata_Cursor_Rainbow"
+license=('GPL-3.0-or-later')
+# nomes de pacotes do Void (o Arch usa libxcursor)
+depends=('libXcursor' 'libpng')
+# o Void não tem clickgen: a versão 1.x é instalada do PyPI num venv durante o build
+_clickgen_ver=1.2.0
+makedepends=('python3' 'python3-pip' 'unzip')
+options=('!strip')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz"
+	"$pkgname-bitmaps-$pkgver.zip::$url/releases/download/v$pkgver/bitmaps.zip")
+noextract=("$pkgname-bitmaps-$pkgver.zip") # ignorado pelo pkgmake (o .zip também é extraído em $srcdir)
+sha256sums=('95aa35220093fec18255465c07aba65aa4f6571761690886eb1e99dd7f8155ad'
+	'14fbf46bbb69bed0f3a6b48e544995d27cfba49298a26225eff970a1cde60011')
+
+prepare() {
+	cd Bibata_Cursor_Rainbow-$pkgver
+	mkdir -p bitmaps
+	unzip -qo "$srcdir/$pkgname-bitmaps-$pkgver.zip" -d bitmaps/
+
+	rm -rf themes
+
+	# venv com clickgen 1.x (o python3 do Void vem sem ensurepip: venv sem pip + pip do sistema)
+	if [[ ! -x "$srcdir/venv/bin/python" ]]; then
+		python3 -m venv --without-pip "$srcdir/venv"
+	fi
+	python3 -m pip --python "$srcdir/venv/bin/python" install -q "clickgen==${_clickgen_ver}"
+}
+
+build() {
+	cd Bibata_Cursor_Rainbow-$pkgver
+
+	pushd builder
+	PATH="$srcdir/venv/bin:$PATH" make build_unix
+	popd
+}
+
+package() {
+	cd Bibata_Cursor_Rainbow-$pkgver
+	install -d "$pkgdir"/usr/share/icons
+	cp -r themes/Bibata-* "$pkgdir"/usr/share/icons/
+}
+
+pre_install() {
+	log "Iniciando instalação"
+}
+
+post_install() {
+	log "Finalizando instalação"
+}
+
+pre_upgrade() {
+	log "Iniciando upgrade"
+}
+
+post_upgrade() {
+	log "Finalizando upgrade"
+}
