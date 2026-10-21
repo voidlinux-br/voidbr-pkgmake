@@ -4,7 +4,7 @@
 pkgname=voidbr-samba
 pkgbase=samba
 pkgdesc="SMB/CIFS file, print, and login server for Unix"
-pkgver=4.24.6
+pkgver=4.25.0
 pkgrel=1
 arch=(x86_64)
 license=('GPL-3.0-or-later')
@@ -20,26 +20,21 @@ makedepends=(
 	avahi-libs
 	base-devel
 	binutils
-	bind
 	bison
-	ccache
 	chrpath
 	cups-devel
 	curl
-	dateutils
 	dbus
 	dbus-devel
 	docbook-xml
 	docbook-xsl
 	flex
 	gcc
-	git
 	glib-devel
-	glusterfs
+	glusterfs-devel
 	gnutls
 	gnutls-devel
 	gpgme-devel
-	htop
 	icu-devel
 	jansson
 	jansson-devel
@@ -61,7 +56,7 @@ makedepends=(
 	libtirpc
 	libtirpc-devel
 	libunwind-devel
-	liburing
+	liburing-devel
 	libuuid-devel
 	libxslt
 	linux-headers
@@ -72,17 +67,14 @@ makedepends=(
 	mit-krb5-client
 	mit-krb5-devel
 	ncurses-devel
-	net-tools
 	pam
 	pam-devel
 	perl
 	perl-JSON
 	perl-Parse-Yapp
-	perl-Text-ParseWords
 	pkg-config
 	popt
 	popt-devel
-	python
 	python3
 	python3-cryptography
 	python3-devel
@@ -93,39 +85,19 @@ makedepends=(
 	readline
 	readline-devel
 	rpcsvc-proto
-	rsync
 	talloc
 	tdb
 	tdb-devel
 	tevent
-	tree
-	vim
-	wget
 	xfsprogs-devel
 	zlib-devel
-	python3-devel
-	perl-Parse-Yapp
 	gperf
-	libtirpc-devel
-	linux-headers
-	gnutls-devel
-	jansson-devel
-	lmdb-devel
-	popt-devel
-	readline-devel
-	flex
-	bison
-	libxslt
-	docbook-xsl
 )
 depends=(
     python3
     python3-dnspython
     python3-cryptography
-    python3-matplotlib
-    python3-pexpect
     python3-pyasn1
-    ldb
     libbsd
     gnutls
     icu
@@ -134,6 +106,7 @@ depends=(
     python3-Markdown
     mit-krb5
     mit-krb5-client
+    tdb
 )
 
 build() {
@@ -168,14 +141,22 @@ build() {
 
 package() {
     cd "$srcdir/$pkgbase-$pkgver"
-    make DESTDIR="$pkgdir" install
+    env -i \
+        PATH="/usr/bin:/bin" \
+        HOME="$HOME" \
+        USER="$USER" \
+        LANG="${LANG:-C}" \
+        TERM="${TERM:-xterm}" \
+        make DESTDIR="$pkgdir" install || {
+            msg "make install falhou"
+            return 1
+        }
 
     mkdir -p "$pkgdir/opt/samba/var/lock/"
     mkdir -p "$pkgdir/opt/samba/var/locks/"
 
     mkdir -p "$pkgdir/etc/profile.d/"
     echo 'export PATH=/opt/samba/bin:/opt/samba/sbin:$PATH' > "$pkgdir/etc/profile.d/voidbr-samba.sh"
-    chmod +x "$pkgdir/etc/profile.d/voidbr-samba.sh"
 
     mkdir -p "$pkgdir"/etc/sv/samba-ad-dc/log
     {
@@ -202,9 +183,9 @@ package() {
         echo
         echo '# 4. Execução do Samba conforme sua especificação'
         echo '# -i: modo interativo'
-        echo '# -M single: modelo de processo único'
+        echo '# modelo de processo: prefork (padrão do samba)'
         echo '# --debuglevel=3: logs detalhados'
-        echo 'exec /opt/samba/sbin/samba -i -M single --debuglevel=3 2>&1'
+        echo 'exec /opt/samba/sbin/samba -i --debuglevel=3 2>&1'
     } > "$pkgdir"/etc/sv/samba-ad-dc/run
     chmod +x "$pkgdir"/etc/sv/samba-ad-dc/run
 
@@ -215,7 +196,7 @@ package() {
 
         echo '# Executa o svlogd apontando para o diretório de logs'
         echo 'exec svlogd -tt /var/log/samba-ad-dc'
-    } > "$pkgdir"/etc/sv/samba-ad-dc//log/run
+    } > "$pkgdir"/etc/sv/samba-ad-dc/log/run
     chmod +x "$pkgdir"/etc/sv/samba-ad-dc/log/run
 
     {
@@ -226,3 +207,25 @@ package() {
     } > "$pkgdir"/etc/dhcpcd.conf.samba
 
 }
+
+pre_install() {
+  log "Iniciando instalação"
+}
+
+post_install() {
+  if [ "${update:-}" = "yes" ]; then
+    log "Finalizando upgrade"
+  else
+    log "Finalizando instalação"
+  fi
+
+}
+
+pre_upgrade() {
+  log "Iniciando upgrade"
+}
+
+post_upgrade() {
+  post_install
+}
+
